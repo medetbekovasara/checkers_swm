@@ -99,3 +99,18 @@ create policy "room events are readable"
 create policy "authenticated users can write room events"
   on public.room_events for insert
   with check (auth.role() = 'authenticated');
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'room_events'
+    )
+  then
+    alter publication supabase_realtime add table public.room_events;
+  end if;
+end $$;

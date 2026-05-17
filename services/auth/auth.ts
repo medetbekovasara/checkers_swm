@@ -56,6 +56,11 @@ const notConfiguredError: AuthServiceError = {
   message: "Supabase auth is not configured."
 };
 
+function getAuthRedirectUrl() {
+  if (typeof window !== "undefined") return window.location.origin;
+  return process.env.NEXT_PUBLIC_SITE_URL;
+}
+
 function readGuestIdentity(): GuestIdentity | null {
   if (typeof localStorage === "undefined") return null;
 
@@ -126,7 +131,10 @@ export async function signUp(credentials: SignUpCredentials): Promise<AuthResult
   const { data, error } = await supabase.auth.signUp({
     email: credentials.email,
     password: credentials.password,
-    options: credentials.handle ? { data: { handle: credentials.handle } } : undefined
+    options: {
+      data: credentials.handle ? { handle: credentials.handle } : undefined,
+      emailRedirectTo: getAuthRedirectUrl()
+    }
   });
 
   if (error) return { ok: false, error: { code: "auth_error", message: error.message } };

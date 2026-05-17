@@ -95,14 +95,22 @@ export function OnlineScreen({ profile, onBack }: OnlineScreenProps) {
             Create invite link
           </button>
           {roomLink && (
-            <button
-              type="button"
-              onClick={() => void copyRoom()}
-              className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-[#ded8c9] bg-white px-4 py-3 text-sm text-ink/[0.68] transition hover:text-ink"
-            >
-              <Copy className="h-4 w-4" />
-              Copy link
-            </button>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => void copyRoom()}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-[#ded8c9] bg-white px-4 py-3 text-sm text-ink/[0.68] transition hover:text-ink"
+              >
+                <Copy className="h-4 w-4" />
+                Copy link
+              </button>
+              <a
+                href={roomLink}
+                className="flex min-h-11 w-full items-center justify-center rounded-[8px] border border-[#ded8c9] bg-[#f8f5ec] px-4 py-3 text-sm font-semibold text-ink/[0.72] transition hover:bg-white hover:text-ink"
+              >
+                Open room
+              </a>
+            </div>
           )}
         </div>
 

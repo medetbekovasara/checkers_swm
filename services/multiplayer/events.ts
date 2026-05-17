@@ -51,6 +51,8 @@ export type MoveAcceptedEvent = {
   idempotencyKey: string;
   version: number;
   move: Move;
+  state: GameState;
+  moveCount: number;
   stateHash: string;
   acceptedAt: string;
 };

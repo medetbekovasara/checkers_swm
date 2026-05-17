@@ -1,5 +1,6 @@
-import { Arena } from "@/components/game/Arena";
+import { OnlineArena } from "@/components/game/OnlineArena";
 
-export default function RoomPage() {
-  return <Arena />;
+export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <OnlineArena inviteCode={id} />;
 }

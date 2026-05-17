@@ -1,4 +1,4 @@
-import type { GameState, Move, Player } from "@/game-engine";
+import { applyMove, type GameState, type Move, type Player } from "@/game-engine";
 import { uid } from "@/lib/utils";
 import { supabase } from "@/services/supabase/client";
 import {
@@ -172,6 +172,10 @@ function toRoomSnapshot(row: RoomRow): RoomSnapshot {
   };
 }
 
+function asRoomRow(value: unknown): RoomRow {
+  return value as RoomRow;
+}
+
 function toRoomRow(snapshot: RoomSnapshot): RoomRow {
   return {
     id: snapshot.roomId,
@@ -187,6 +191,10 @@ function toRoomRow(snapshot: RoomSnapshot): RoomRow {
     created_at: snapshot.session.createdAt,
     updated_at: snapshot.session.updatedAt
   };
+}
+
+function roomSelectColumns() {
+  return "id, invite_code, status, visibility, version, state_hash, move_count, players, spectators, game_state, created_at, updated_at";
 }
 
 function createLocalRoomRecord(input: CreateRoomSessionInput): LocalRoomRecord {
@@ -234,9 +242,7 @@ export async function createRoomSession(input: CreateRoomSessionInput): Promise<
   const { data, error } = await supabase
     .from("rooms")
     .insert(toRoomRow(localRecord.snapshot))
-    .select(
-      "id, invite_code, status, visibility, version, state_hash, move_count, players, spectators, game_state, created_at, updated_at"
-    )
+    .select(roomSelectColumns())
     .single();
 
   if (error) {
@@ -247,7 +253,7 @@ export async function createRoomSession(input: CreateRoomSessionInput): Promise<
     };
   }
 
-  return { ok: true, source: "supabase", data: toRoomSnapshot(data as RoomRow) };
+  return { ok: true, source: "supabase", data: toRoomSnapshot(asRoomRow(data)) };
 }
 
 export function createRoomLink(session: Pick<RoomSession, "inviteCode">, origin = "") {
@@ -282,9 +288,7 @@ export async function joinRoomByLink(input: JoinRoomInput): Promise<RoomServiceR
 
   const { data, error } = await supabase
     .from("rooms")
-    .select(
-      "id, invite_code, status, visibility, version, state_hash, move_count, players, spectators, game_state, created_at, updated_at"
-    )
+    .select(roomSelectColumns())
     .eq("invite_code", inviteCode)
     .maybeSingle();
 
@@ -304,7 +308,7 @@ export async function joinRoomByLink(input: JoinRoomInput): Promise<RoomServiceR
     };
   }
 
-  const joinedSnapshot = addParticipantToSnapshot(toRoomSnapshot(data as RoomRow), input);
+  const joinedSnapshot = addParticipantToSnapshot(toRoomSnapshot(asRoomRow(data)), input);
   const { data: updatedData, error: updateError } = await supabase
     .from("rooms")
     .update({
@@ -314,9 +318,7 @@ export async function joinRoomByLink(input: JoinRoomInput): Promise<RoomServiceR
       updated_at: joinedSnapshot.session.updatedAt
     })
     .eq("id", joinedSnapshot.roomId)
-    .select(
-      "id, invite_code, status, visibility, version, state_hash, move_count, players, spectators, game_state, created_at, updated_at"
-    )
+    .select(roomSelectColumns())
     .single();
 
   if (updateError) {
@@ -327,7 +329,53 @@ export async function joinRoomByLink(input: JoinRoomInput): Promise<RoomServiceR
     };
   }
 
-  return { ok: true, source: "supabase", data: toRoomSnapshot(updatedData as RoomRow) };
+  const updatedSnapshot = toRoomSnapshot(asRoomRow(updatedData));
+  await insertRoomEvent(createPresenceEvent(updatedSnapshot));
+
+  return { ok: true, source: "supabase", data: updatedSnapshot };
+}
+
+export async function getRoomSnapshotByInviteCode(inviteCodeOrUrl: string): Promise<RoomServiceResult<RoomSnapshot>> {
+  const inviteCode = parseInviteCode(inviteCodeOrUrl);
+  const localRecord = [...localRooms.values()].find((record) => (
+    record.snapshot.session.inviteCode === inviteCode || record.snapshot.roomId === inviteCode
+  ));
+
+  if (!supabase || localRecord) {
+    if (!localRecord) {
+      return {
+        ok: false,
+        source: "local",
+        error: { code: "room_not_found", message: `Room invite ${inviteCode} was not found.` }
+      };
+    }
+
+    return { ok: true, source: "local", data: localRecord.snapshot };
+  }
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .select(roomSelectColumns())
+    .or(`invite_code.eq.${inviteCode},id.eq.${inviteCode}`)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_persistence_error", message: error.message }
+    };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_not_found", message: `Room invite ${inviteCode} was not found.` }
+    };
+  }
+
+  return { ok: true, source: "supabase", data: toRoomSnapshot(asRoomRow(data)) };
 }
 
 export function createLocalRoom(game: GameState): RoomSnapshot {
@@ -363,11 +411,14 @@ export async function submitMoveCommand(command: MoveCommand): Promise<RoomServi
     }
 
     const acceptedAt = now();
-    const nextState: GameState = {
-      ...localRecord.snapshot.state,
-      moves: [...localRecord.snapshot.state.moves, command.move],
-      turn: localRecord.snapshot.state.turn + 1
-    };
+    const nextState = applyMove(localRecord.snapshot.state, command.move);
+    if (nextState === localRecord.snapshot.state || nextState.moves.length === localRecord.snapshot.state.moves.length) {
+      return {
+        ok: false,
+        source: "local",
+        error: { code: "room_conflict", message: "Move is not legal for the current room state." }
+      };
+    }
     const stateHash = createStateHash(nextState);
     const acceptedEvent: MoveAcceptedEvent = {
       type: "move_accepted",
@@ -376,6 +427,8 @@ export async function submitMoveCommand(command: MoveCommand): Promise<RoomServi
       idempotencyKey: command.idempotencyKey,
       version: localRecord.snapshot.session.version + 1,
       move: command.move,
+      state: nextState,
+      moveCount: nextState.moves.length,
       stateHash,
       acceptedAt
     };
@@ -384,10 +437,10 @@ export async function submitMoveCommand(command: MoveCommand): Promise<RoomServi
       ...localRecord.snapshot,
       session: {
         ...localRecord.snapshot.session,
-        status: "active",
+        status: nextState.status === "active" ? "active" : "completed",
         version: acceptedEvent.version,
         stateHash,
-        moveCount: localRecord.snapshot.session.moveCount + 1,
+        moveCount: acceptedEvent.moveCount,
         updatedAt: acceptedAt
       },
       state: nextState
@@ -399,17 +452,119 @@ export async function submitMoveCommand(command: MoveCommand): Promise<RoomServi
     return { ok: true, source: "local", data: acceptedEvent };
   }
 
-  const { data, error } = await supabase
+  const { data: roomData, error: roomError } = await supabase
+    .from("rooms")
+    .select(roomSelectColumns())
+    .eq("id", command.roomId)
+    .maybeSingle();
+
+  if (roomError) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_persistence_error", message: roomError.message }
+    };
+  }
+
+  if (!roomData) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_not_found", message: `Room ${command.roomId} was not found.` }
+    };
+  }
+
+  const snapshot = toRoomSnapshot(asRoomRow(roomData));
+  if (command.baseVersion !== snapshot.session.version) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: {
+        code: "stale_room_version",
+        message: `Expected base version ${snapshot.session.version}, received ${command.baseVersion}.`
+      }
+    };
+  }
+
+  const nextState = applyMove(snapshot.state, command.move);
+  if (nextState === snapshot.state || nextState.moves.length === snapshot.state.moves.length) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_conflict", message: "Move is not legal for the current room state." }
+    };
+  }
+
+  const acceptedAt = now();
+  const stateHash = createStateHash(nextState);
+  const acceptedEvent: MoveAcceptedEvent = {
+    type: "move_accepted",
+    roomId: command.roomId,
+    clientId: command.clientId,
+    idempotencyKey: command.idempotencyKey,
+    version: snapshot.session.version + 1,
+    move: command.move,
+    state: nextState,
+    moveCount: nextState.moves.length,
+    stateHash,
+    acceptedAt
+  };
+
+  const { data: updatedRoom, error: updateError } = await supabase
+    .from("rooms")
+    .update({
+      status: nextState.status === "active" ? "active" : "completed",
+      version: acceptedEvent.version,
+      state_hash: stateHash,
+      move_count: acceptedEvent.moveCount,
+      game_state: nextState,
+      updated_at: acceptedAt
+    })
+    .eq("id", command.roomId)
+    .eq("version", command.baseVersion)
+    .select(roomSelectColumns())
+    .maybeSingle();
+
+  if (updateError) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "room_persistence_error", message: updateError.message }
+    };
+  }
+
+  if (!updatedRoom) {
+    return {
+      ok: false,
+      source: "supabase",
+      error: { code: "stale_room_version", message: "Room changed before this move was accepted." }
+    };
+  }
+
+  const inserted = await insertRoomEvent(acceptedEvent, command.baseVersion);
+  if (!inserted.ok) {
+    return {
+      ok: false,
+      source: inserted.source,
+      error: inserted.error
+    };
+  }
+
+  return { ok: true, source: "supabase", data: acceptedEvent };
+}
+
+async function insertRoomEvent(event: RoomEvent, baseVersion?: number): Promise<RoomServiceResult<RoomEvent>> {
+  if (!supabase) return { ok: true, source: "local", data: event };
+
+  const { error } = await supabase
     .from("room_events")
     .insert({
-      room_id: command.roomId,
-      type: command.type,
-      idempotency_key: command.idempotencyKey,
-      base_version: command.baseVersion,
-      payload: command
-    })
-    .select("payload")
-    .single();
+      room_id: event.roomId,
+      type: event.type,
+      idempotency_key: "idempotencyKey" in event ? event.idempotencyKey : null,
+      base_version: baseVersion ?? ("version" in event ? event.version : null),
+      payload: event
+    });
 
   if (error) {
     return {
@@ -419,16 +574,7 @@ export async function submitMoveCommand(command: MoveCommand): Promise<RoomServi
     };
   }
 
-  const payload = (data as { payload: MoveAcceptedEvent | MoveCommand }).payload;
-  if (payload.type !== "move_accepted") {
-    return {
-      ok: false,
-      source: "supabase",
-      error: { code: "room_conflict", message: "Move command was stored but no accepted event was returned." }
-    };
-  }
-
-  return { ok: true, source: "supabase", data: payload };
+  return { ok: true, source: "supabase", data: event };
 }
 
 export function getLocalRoomSnapshot(roomId: string): RoomSnapshot | null {

@@ -9,7 +9,7 @@ import { GamePiece } from "./GamePiece";
 type CheckersBoardProps = {
   state: GameState;
   selectedMoves: Move[];
-  playablePlayer?: Player;
+  playablePlayer?: Player | null;
   onSelectPiece: (pieceId: string) => void;
   onMoveTo: (row: number, col: number) => void;
 };
@@ -45,7 +45,7 @@ export function CheckersBoard({ state, selectedMoves, playablePlayer = state.cur
               highlighted={highlighted}
               lastDestination={lastDestination}
               selected={piece?.id === state.selectedPieceId}
-              selectable={piece?.player === state.currentPlayer && piece.player === playablePlayer}
+              selectable={playablePlayer !== null && piece?.player === state.currentPlayer && piece.player === playablePlayer}
               onSelectPiece={onSelectPiece}
               onMoveTo={onMoveTo}
             />
