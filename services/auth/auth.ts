@@ -56,6 +56,16 @@ const notConfiguredError: AuthServiceError = {
   message: "Supabase auth is not configured."
 };
 
+function authNetworkError(error: unknown): AuthServiceError {
+  const message = error instanceof Error ? error.message : "Unable to reach Supabase auth.";
+  return {
+    code: "auth_error",
+    message: message === "Load failed"
+      ? "Could not reach Supabase Auth. Check deployed NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and Supabase allowed redirect URLs."
+      : message
+  };
+}
+
 function getAuthRedirectUrl() {
   if (typeof window !== "undefined") return window.location.origin;
   return process.env.NEXT_PUBLIC_SITE_URL;
@@ -119,52 +129,68 @@ export function identityFromSession(session: Session): SupabaseIdentity {
 export async function signIn(credentials: AuthCredentials): Promise<AuthResult<AuthSession>> {
   if (!supabase) return { ok: false, error: notConfiguredError };
 
-  const { data, error } = await supabase.auth.signInWithPassword(credentials);
-  if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword(credentials);
+    if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
 
-  return { ok: true, data: { session: data.session, user: data.user } };
+    return { ok: true, data: { session: data.session, user: data.user } };
+  } catch (error) {
+    return { ok: false, error: authNetworkError(error) };
+  }
 }
 
 export async function signUp(credentials: SignUpCredentials): Promise<AuthResult<AuthSession>> {
   if (!supabase) return { ok: false, error: notConfiguredError };
 
-  const { data, error } = await supabase.auth.signUp({
-    email: credentials.email,
-    password: credentials.password,
-    options: {
-      data: credentials.handle ? { handle: credentials.handle } : undefined,
-      emailRedirectTo: getAuthRedirectUrl()
-    }
-  });
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: credentials.email,
+      password: credentials.password,
+      options: {
+        data: credentials.handle ? { handle: credentials.handle } : undefined,
+        emailRedirectTo: getAuthRedirectUrl()
+      }
+    });
 
-  if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
+    if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
 
-  return { ok: true, data: { session: data.session, user: data.user } };
+    return { ok: true, data: { session: data.session, user: data.user } };
+  } catch (error) {
+    return { ok: false, error: authNetworkError(error) };
+  }
 }
 
 export async function signOut(): Promise<AuthResult<null>> {
   clearGuestIdentity();
   if (!supabase) return { ok: true, data: null };
 
-  const { error } = await supabase.auth.signOut();
-  if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
 
-  return { ok: true, data: null };
+    return { ok: true, data: null };
+  } catch (error) {
+    return { ok: false, error: authNetworkError(error) };
+  }
 }
 
 export async function getSession(): Promise<AuthResult<AuthSession>> {
   if (!supabase) return { ok: false, error: notConfiguredError };
 
-  const { data, error } = await supabase.auth.getSession();
-  if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { ok: false, error: { code: "auth_error", message: error.message } };
 
-  return {
-    ok: true,
-    data: {
-      session: data.session,
-      user: data.session?.user ?? null
-    }
-  };
+    return {
+      ok: true,
+      data: {
+        session: data.session,
+        user: data.session?.user ?? null
+      }
+    };
+  } catch (error) {
+    return { ok: false, error: authNetworkError(error) };
+  }
 }
 
 export async function getCurrentIdentity(): Promise<AuthIdentity | null> {
