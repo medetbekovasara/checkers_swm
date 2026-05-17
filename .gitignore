@@ -63,3 +63,4 @@ temp/
 *.local
 *.bak
 *.swp
+.agents
