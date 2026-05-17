@@ -104,12 +104,15 @@ export function OnlineScreen({ profile, onBack }: OnlineScreenProps) {
                 <Copy className="h-4 w-4" />
                 Copy link
               </button>
-              <a
-                href={roomLink}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = roomLink;
+                }}
                 className="flex min-h-11 w-full items-center justify-center rounded-[8px] border border-[#ded8c9] bg-[#f8f5ec] px-4 py-3 text-sm font-semibold text-ink/[0.72] transition hover:bg-white hover:text-ink"
               >
                 Open room
-              </a>
+              </button>
             </div>
           )}
         </div>
