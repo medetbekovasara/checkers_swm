@@ -6,6 +6,7 @@ import { AiSetupScreen } from "@/components/platform/AiSetupScreen";
 import { AuthScreen } from "@/components/platform/AuthScreen";
 import { MainMenu, type PlatformScreen } from "@/components/platform/MainMenu";
 import { MatchHistoryScreen, ProfileScreen, RankingsScreen, SettingsScreen } from "@/components/platform/InfoScreens";
+import { OnlineScreen } from "@/components/platform/OnlineScreen";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { usePlatformProfile } from "@/hooks/usePlatformProfile";
 import type { AiDifficulty } from "@/services/ai/difficulty";
@@ -106,6 +107,7 @@ export function PlatformApp() {
   }
 
   if (screen === "rankings") return <RankingsScreen profile={profile} onBack={() => setScreen("menu")} />;
+  if (screen === "online") return <OnlineScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "profile") return <ProfileScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "history") return <MatchHistoryScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "settings") return <SettingsScreen profile={profile} onBack={() => setScreen("menu")} />;

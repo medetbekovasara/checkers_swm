@@ -17,7 +17,11 @@ export async function POST(request: Request) {
     messages: [
       {
         role: "system",
-        content: "Return concise JSON with summary:string, advice:string[], style:string for a checkers post-game coach."
+        content: [
+          "Return concise JSON with summary:string, advice:string[], style:string for a checkers post-game coach.",
+          "Analyze risky moves, missed captures, defense, aggression, endgame conversion, and chaos side swaps when present.",
+          "Keep advice practical, short, and specific. Do not exceed 4 advice items."
+        ].join(" ")
       },
       {
         role: "user",

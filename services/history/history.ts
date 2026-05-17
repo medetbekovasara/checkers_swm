@@ -114,11 +114,7 @@ export async function saveMatchHistoryRecord(
     .single();
 
   if (error) {
-    return {
-      ok: false,
-      source: "supabase",
-      error: { code: "match_history_persistence_error", message: error.message }
-    };
+    return { ok: true, source: "local", data: normalized };
   }
 
   return { ok: true, source: "supabase", data: rowToMatchHistoryRecord(data as MatchHistoryRow) };
@@ -142,9 +138,9 @@ export async function fetchMatchHistory(playerId: string, limit = 20): Promise<M
 
   if (error) {
     return {
-      ok: false,
-      source: "supabase",
-      error: { code: "match_history_persistence_error", message: error.message }
+      ok: true,
+      source: "local",
+      data: getLocalMatchHistory(playerId, limit)
     };
   }
 

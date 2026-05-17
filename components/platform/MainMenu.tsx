@@ -4,7 +4,7 @@ import { BarChart3, Bot, Clock3, Globe2, Settings, Trophy, UserRound } from "luc
 import type { PlayerProfile } from "@/services/profile/profile";
 import { getRankTier } from "@/services/ranking/ranking";
 
-export type PlatformScreen = "menu" | "ai-setup" | "rankings" | "profile" | "history" | "settings" | "game";
+export type PlatformScreen = "menu" | "ai-setup" | "online" | "rankings" | "profile" | "history" | "settings" | "game";
 
 type MainMenuProps = {
   profile: PlayerProfile;
@@ -14,7 +14,7 @@ type MainMenuProps = {
 
 const items: Array<{ screen: PlatformScreen; label: string; description: string; icon: React.ReactNode; disabled?: boolean }> = [
   { screen: "ai-setup", label: "Play vs AI", description: "Choose difficulty and mode.", icon: <Bot className="h-5 w-5" /> },
-  { screen: "menu", label: "Play Online", description: "Room matchmaking is coming soon.", icon: <Globe2 className="h-5 w-5" />, disabled: true },
+  { screen: "online", label: "Play Online", description: "Create or join a room link.", icon: <Globe2 className="h-5 w-5" /> },
   { screen: "rankings", label: "Rankings", description: "See XP leaders and streaks.", icon: <Trophy className="h-5 w-5" /> },
   { screen: "profile", label: "Profile", description: "View progress and identity.", icon: <UserRound className="h-5 w-5" /> },
   { screen: "history", label: "Match History", description: "Recent games and rewards.", icon: <Clock3 className="h-5 w-5" /> },

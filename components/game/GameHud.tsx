@@ -144,7 +144,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function formatClock(seconds: number | null) {
   if (seconds === null) return "--:--";
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
+  const totalSeconds = Math.ceil(seconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }

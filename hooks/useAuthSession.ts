@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   createGuestIdentity,
   getCurrentIdentity,
+  identityFromSession,
   signInWithEmail,
   signOut,
   signUpWithEmail,
   type AuthIdentity
 } from "@/services/auth/auth";
+import { supabase } from "@/services/supabase/client";
 
 export type AuthView = "login" | "signup";
 
@@ -18,9 +20,26 @@ export function useAuthSession() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     void getCurrentIdentity()
-      .then(setIdentity)
-      .finally(() => setLoading(false));
+      .then((current) => {
+        if (active) setIdentity(current);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    const subscription = supabase?.auth.onAuthStateChange((_event, session) => {
+      setIdentity(session ? identityFromSession(session) : null);
+      setLoading(false);
+      setError(null);
+    });
+
+    return () => {
+      active = false;
+      subscription?.data.subscription.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

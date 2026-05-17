@@ -44,12 +44,17 @@ export function useChaosCheckers(
   useEffect(() => {
     if (!modeConfig.gameplay.timers || state.status !== "active") return;
 
+    let lastTick = Date.now();
     const interval = window.setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastTick;
+      lastTick = now;
+
       setTimers((currentTimers) => {
         const remaining = currentTimers[state.currentPlayer];
         if (remaining === null) return currentTimers;
 
-        const nextRemaining = Math.max(0, remaining - 1);
+        const nextRemaining = Math.max(0, remaining - elapsed);
         if (nextRemaining === remaining) return currentTimers;
 
         if (nextRemaining === 0) {
@@ -69,7 +74,7 @@ export function useChaosCheckers(
 
         return { ...currentTimers, [state.currentPlayer]: nextRemaining };
       });
-    }, 1000);
+    }, 100);
 
     return () => window.clearInterval(interval);
   }, [modeConfig.gameplay.timers, state.currentPlayer, state.status]);
@@ -237,7 +242,7 @@ function createAiTurnKey(state: GameState) {
 function createTimers(mode: PlayMode): GameTimers {
   const seconds = getPlayModeConfig(mode).gameplay.initialClockSeconds;
   return {
-    red: seconds,
-    black: seconds
+    red: seconds === null ? null : seconds * 1000,
+    black: seconds === null ? null : seconds * 1000
   };
 }
