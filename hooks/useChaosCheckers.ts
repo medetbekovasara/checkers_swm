@@ -10,7 +10,7 @@ import {
   Move,
   Player
 } from "@/game-engine";
-import { getAiDifficultyConfig, type AiDifficulty } from "@/services/ai/difficulty";
+import { getAiDifficultyConfig, getAiThinkingDelayMs, type AiDifficulty } from "@/services/ai/difficulty";
 import { applyAiTurn, applyRuntimeMove } from "@/services/ai/turn";
 import { getPlayModeConfig, type GameTimers, type PlayMode } from "@/services/ai/modes";
 
@@ -21,7 +21,7 @@ export function useChaosCheckers(
 ) {
   const modeConfig = useMemo(() => getPlayModeConfig(initialMode), [initialMode]);
   const [state, setState] = useState<GameState>(() => createInitialState(modeConfig.engineMode));
-  const [timers, setTimers] = useState<GameTimers>(() => createTimers(initialMode));
+  const [timers, setTimers] = useState<GameTimers>(() => createTimers(initialMode, initialDifficulty));
   const [controlledSide, setControlledSide] = useState<Player>(playerSide);
   const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>(initialDifficulty);
   const [lastMove, setLastMove] = useState<Move | null>(null);
@@ -88,7 +88,11 @@ export function useChaosCheckers(
   };
 
   const queueAiTurn = (expectedState: GameState, humanSide: Player) => {
-    if (expectedState.status !== "active" || expectedState.currentPlayer === humanSide) {
+    if (
+      modeConfig.gameplay.localMultiplayer ||
+      expectedState.status !== "active" ||
+      expectedState.currentPlayer === humanSide
+    ) {
       setPendingAiTurnKey(null);
       setIsAiThinking(false);
       return;
@@ -119,7 +123,7 @@ export function useChaosCheckers(
       return;
     }
 
-    if (state.status !== "active" || state.currentPlayer === controlledSide) {
+    if (modeConfig.gameplay.localMultiplayer || state.status !== "active" || state.currentPlayer === controlledSide) {
       setIsAiThinking(false);
       return;
     }
@@ -131,24 +135,30 @@ export function useChaosCheckers(
     state.currentPlayer,
     state.moves.length,
     state.status,
-    aiDifficulty,
-    modeConfig,
-    modeConfig.gameplay.aiDelayMs,
     controlledSide,
-    hasPendingSideSwap
+    hasPendingSideSwap,
+    modeConfig.gameplay.localMultiplayer
   ]);
 
   useEffect(() => {
     if (!pendingAiTurnKey) return;
 
-    const currentTurnKey = createAiTurnKey(state);
-    if (state.status !== "active" || state.currentPlayer === controlledSide) {
+    const aiTurnKey = createAiTurnKey(state);
+    if (
+      modeConfig.gameplay.localMultiplayer ||
+      state.status !== "active" ||
+      state.currentPlayer === controlledSide
+    ) {
       setPendingAiTurnKey(null);
       setIsAiThinking(false);
       return;
     }
 
-    if (currentTurnKey !== pendingAiTurnKey || completedAiTurnKeyRef.current === pendingAiTurnKey) {
+    if (aiTurnKey !== pendingAiTurnKey) return;
+
+    if (completedAiTurnKeyRef.current === aiTurnKey) {
+      setPendingAiTurnKey(null);
+      setIsAiThinking(false);
       return;
     }
 
@@ -158,18 +168,18 @@ export function useChaosCheckers(
     aiTimeoutRef.current = window.setTimeout(() => {
       aiTimeoutRef.current = null;
       setState((current) => {
-        if (createAiTurnKey(current) !== pendingAiTurnKey || completedAiTurnKeyRef.current === pendingAiTurnKey) {
+        if (createAiTurnKey(current) !== aiTurnKey || completedAiTurnKeyRef.current === aiTurnKey) {
           return current;
         }
 
         const result = applyAiTurn(current, aiDifficulty, modeConfig, controlledSide);
-        if (result.moved) completedAiTurnKeyRef.current = pendingAiTurnKey;
+        if (result.moved) completedAiTurnKeyRef.current = aiTurnKey;
         if (result.move) setLastMove(result.move);
         return result.state;
       });
       setPendingAiTurnKey(null);
       setIsAiThinking(false);
-    }, modeConfig.gameplay.aiDelayMs);
+    }, getAiThinkingDelayMs(state, aiDifficulty, modeConfig.gameplay.aiDelayMs, modeConfig.gameplay.timers));
 
     return clearAiTimeout;
   }, [aiDifficulty, controlledSide, modeConfig, pendingAiTurnKey, state]);
@@ -177,7 +187,8 @@ export function useChaosCheckers(
   const selectPiece = (pieceId: string) => {
     if (isAiThinking) return;
     const piece = state.pieces.find((candidate) => candidate.id === pieceId);
-    if (!piece || piece.player !== state.currentPlayer || piece.player !== controlledSide) return;
+    if (!piece || piece.player !== state.currentPlayer) return;
+    if (!modeConfig.gameplay.localMultiplayer && piece.player !== controlledSide) return;
     setState((current) => ({ ...current, selectedPieceId: pieceId }));
   };
 
@@ -209,7 +220,7 @@ export function useChaosCheckers(
     setIsAiThinking(false);
     setControlledSide(playerSide);
     setState(createInitialState(nextModeConfig.engineMode));
-    setTimers(createTimers(mode));
+    setTimers(createTimers(mode, aiDifficulty));
     setLastMove(null);
   };
 
@@ -223,8 +234,8 @@ export function useChaosCheckers(
     modeConfig,
     timers,
     playerSide: controlledSide,
-    isHumanTurn: state.currentPlayer === controlledSide,
-    isAiTurn: state.currentPlayer !== controlledSide,
+    isHumanTurn: modeConfig.gameplay.localMultiplayer || state.currentPlayer === controlledSide,
+    isAiTurn: !modeConfig.gameplay.localMultiplayer && state.currentPlayer !== controlledSide,
     isAiThinking,
     lastMove,
     setAiDifficulty,
@@ -239,10 +250,24 @@ function createAiTurnKey(state: GameState) {
   return `${state.id}:${state.turn}:${state.currentPlayer}:${state.moves.length}`;
 }
 
-function createTimers(mode: PlayMode): GameTimers {
-  const seconds = getPlayModeConfig(mode).gameplay.initialClockSeconds;
+function createTimers(mode: PlayMode, difficulty: AiDifficulty): GameTimers {
+  const seconds = getInitialClockSeconds(mode, difficulty);
   return {
     red: seconds === null ? null : seconds * 1000,
     black: seconds === null ? null : seconds * 1000
   };
+}
+
+function getInitialClockSeconds(mode: PlayMode, difficulty: AiDifficulty) {
+  const modeConfig = getPlayModeConfig(mode);
+  if (!modeConfig.gameplay.timers) return null;
+  if (!modeConfig.gameplay.localMultiplayer) return modeConfig.gameplay.initialClockSeconds;
+
+  const localMatchSeconds: Record<AiDifficulty, number> = {
+    beginner: 120,
+    intermediate: 90,
+    nightmare: 60
+  };
+
+  return localMatchSeconds[difficulty];
 }

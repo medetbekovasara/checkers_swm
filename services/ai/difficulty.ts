@@ -24,6 +24,10 @@ export type AiDifficultyConfig = {
   description: string;
   depth: number;
   personality: AiPersonality;
+  timedThinkingMs: {
+    min: number;
+    max: number;
+  };
   mistake: AiMistakeBehavior;
 };
 
@@ -40,6 +44,10 @@ export const AI_DIFFICULTY_CONFIGS = {
     description: "Short lookahead with periodic deterministic weaker choices.",
     depth: 1,
     personality: "defensive",
+    timedThinkingMs: {
+      min: 620,
+      max: 980
+    },
     mistake: {
       enabled: true,
       cadence: 3,
@@ -53,6 +61,10 @@ export const AI_DIFFICULTY_CONFIGS = {
     description: "Balanced tactical play with bounded two-ply search.",
     depth: 2,
     personality: "tactical",
+    timedThinkingMs: {
+      min: 420,
+      max: 720
+    },
     mistake: {
       enabled: false,
       cadence: 0,
@@ -66,6 +78,10 @@ export const AI_DIFFICULTY_CONFIGS = {
     description: "Deepest bounded search with aggressive pressure.",
     depth: 4,
     personality: "aggressive",
+    timedThinkingMs: {
+      min: 260,
+      max: 520
+    },
     mistake: {
       enabled: false,
       cadence: 0,
@@ -85,6 +101,14 @@ export const AI_DIFFICULTIES = AI_DIFFICULTY_ORDER.map((difficulty) => AI_DIFFIC
 
 export function getAiDifficultyConfig(difficulty: AiDifficulty): AiDifficultyConfig {
   return AI_DIFFICULTY_CONFIGS[difficulty];
+}
+
+export function getAiThinkingDelayMs(state: GameState, difficulty: AiDifficulty, baseDelayMs: number, timedMode: boolean) {
+  if (!timedMode) return baseDelayMs;
+
+  const range = getAiDifficultyConfig(difficulty).timedThinkingMs;
+  const spread = Math.max(0, range.max - range.min);
+  return range.min + deterministicIndex(state, spread + 1);
 }
 
 export const selectAiMoveForDifficulty: MoveSelector = (state, difficulty) => {

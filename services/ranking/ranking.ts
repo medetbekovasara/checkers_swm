@@ -81,7 +81,7 @@ const difficultyXpBonus: Record<RankedMatchDifficulty, number> = {
 const modeXpBonus: Record<RankedMatchMode, number> = {
   classic: 0,
   chaos: 20,
-  speed: 10,
+  local: 10,
   ranked: 40,
   friendly: 0
 };

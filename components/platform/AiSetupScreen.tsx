@@ -22,9 +22,9 @@ export function AiSetupScreen({ difficulty, mode, onDifficultyChange, onModeChan
         Menu
       </button>
       <header className="mb-5">
-        <h1 className="text-4xl font-semibold text-ink md:text-5xl">Set up AI match.</h1>
+        <h1 className="text-4xl font-semibold text-ink md:text-5xl">Set up match.</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/[0.58]">
-          Pick a difficulty and mode. Preview modes currently map to stable engine rules while the platform grows.
+          Pick a difficulty and mode. In local multiplayer, difficulty controls the match clock.
         </p>
       </header>
 

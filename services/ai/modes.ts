@@ -1,6 +1,6 @@
 import type { GameMode, Player } from "@/game-engine";
 
-export type AiMode = "classic" | "chaos" | "speed";
+export type AiMode = "classic" | "chaos" | "local";
 export type PlayMode = AiMode;
 export type GameTimers = Record<Player, number | null>;
 
@@ -19,6 +19,7 @@ export type AiModeConfig = {
     timers: boolean;
     initialClockSeconds: number | null;
     aiDelayMs: number;
+    localMultiplayer: boolean;
   };
 };
 
@@ -37,7 +38,8 @@ export const AI_MODES = {
       chaosMaxEvents: 0,
       timers: false,
       initialClockSeconds: null,
-      aiDelayMs: 360
+      aiDelayMs: 360,
+      localMultiplayer: false
     }
   },
   chaos: {
@@ -54,13 +56,14 @@ export const AI_MODES = {
       chaosMaxEvents: 3,
       timers: false,
       initialClockSeconds: null,
-      aiDelayMs: 520
+      aiDelayMs: 520,
+      localMultiplayer: false
     }
   },
-  speed: {
-    id: "speed",
-    label: "Speed",
-    description: "Classic rules with a fast shared clock pressure layer.",
+  local: {
+    id: "local",
+    label: "2 Players Local",
+    description: "Two players share one screen with difficulty-based match clocks.",
     engineMode: "classic",
     gameplay: {
       chaosEvents: false,
@@ -70,8 +73,9 @@ export const AI_MODES = {
       chaosCooldownTurns: 0,
       chaosMaxEvents: 0,
       timers: true,
-      initialClockSeconds: 90,
-      aiDelayMs: 480
+      initialClockSeconds: null,
+      aiDelayMs: 0,
+      localMultiplayer: true
     }
   }
 } satisfies Record<AiMode, AiModeConfig>;
@@ -81,7 +85,7 @@ export const PLAY_MODES = AI_MODES;
 export const AI_MODE_ORDER: AiMode[] = [
   "classic",
   "chaos",
-  "speed"
+  "local"
 ];
 
 export function getAiModeConfig(mode: AiMode): AiModeConfig {

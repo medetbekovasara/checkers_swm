@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Eye, Radio } from "lucide-react";
 import { CheckersBoard } from "@/components/board/CheckersBoard";
 import { GameHud } from "@/components/game/GameHud";
 import { MatchResultModal } from "@/components/game/MatchResultModal";
-import { ReplayTimeline } from "@/components/game/ReplayTimeline";
 import { useChaosCheckers } from "@/hooks/useChaosCheckers";
 import type { GameState, Player } from "@/game-engine";
 import type { AiDifficulty } from "@/services/ai/difficulty";
@@ -37,7 +35,6 @@ export function Arena({
     state,
     selectedMoves,
     aiDifficulty,
-    setAiDifficulty,
     mode,
     modeConfig,
     timers,
@@ -48,14 +45,8 @@ export function Arena({
     reset
   } = useChaosCheckers(initialMode, initialDifficulty, "red");
 
-  const [origin, setOrigin] = useState("");
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString());
   const reportedMatchRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   useEffect(() => {
     if (state.status === "active") return;
@@ -74,89 +65,35 @@ export function Arena({
     });
   }, [aiDifficulty, initialMode, onMatchComplete, playerSide, startedAt, state]);
 
-  const roomUrl = origin ? `${origin}/room/${state.id}` : `/room/${state.id}`;
   const restartMatch = () => {
     reportedMatchRef.current = null;
     setStartedAt(new Date().toISOString());
     reset(initialMode);
   };
 
-  const copyRoomLink = async () => {
-    if (!navigator.clipboard) {
-      setCopyState("failed");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(roomUrl);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1600);
-    } catch {
-      setCopyState("failed");
-      window.setTimeout(() => setCopyState("idle"), 1800);
-    }
-  };
-
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-5 md:px-8 md:py-6">
-      <header className="mx-auto flex max-w-7xl flex-col gap-4 pb-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="mb-2 inline-flex rounded-full border border-[#ded8c9] bg-panel/[0.72] px-3 py-1 text-xs font-medium text-ink/[0.55] shadow-sm backdrop-blur-xl">
-            Modern strategy board
-          </div>
-          <h1 className="text-3xl font-semibold tracking-normal text-ink md:text-5xl">
-            Chaos Checkers
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/[0.62] md:text-base">
-            A calm competitive board for checkers, AI practice, replay, and light chaos events.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Pill icon={<Radio className="h-4 w-4" />} label="Realtime-ready" />
-          <Pill icon={<Eye className="h-4 w-4" />} label="Spectator architecture" />
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-6xl gap-4 lg:gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+    <main className="min-h-screen px-2 py-3 sm:px-4 md:px-6 md:py-5">
+      <section className="mx-auto flex max-w-4xl flex-col gap-3">
         <GameHud
           state={state}
           mode={mode}
-          modeConfig={modeConfig}
-          timers={timers}
           aiDifficulty={aiDifficulty}
-          onAiDifficultyChange={setAiDifficulty}
-          isAiThinking={isAiThinking}
+          timers={timers}
           onReset={restartMatch}
-          className="order-2 xl:order-1"
         />
 
-        <div className="order-1 min-w-0 space-y-4 xl:order-2">
-          <div className="rounded-[8px] border border-[#ded8c9] bg-panel/[0.82] p-3 shadow-[0_16px_48px_rgba(63,69,75,0.12)] backdrop-blur-xl md:p-4">
-            <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-ink/[0.42]">Room Link</div>
-                <div className="mt-1 max-w-[72vw] truncate text-sm text-ink/[0.58] md:max-w-md">{roomUrl}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void copyRoomLink()}
-                className="flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-[#d9d2c0] bg-[#f7f3e8] px-3 py-2 text-sm text-ink/[0.72] transition hover:border-[#c9c0aa] hover:bg-white hover:text-ink active:scale-[0.98]"
-                aria-live="polite"
-              >
-                {copyState === "copied" ? <Check className="h-4 w-4 text-mint" /> : <Copy className="h-4 w-4" />}
-                {copyState === "copied" ? "Copied" : copyState === "failed" ? "Unavailable" : "Copy"}
-              </button>
-            </div>
+        <div className="min-w-0 space-y-3">
+          <div className="rounded-[8px] border border-[#ded8c9] bg-panel/[0.82] p-2 shadow-[0_14px_38px_rgba(63,69,75,0.10)] backdrop-blur-xl sm:p-3">
             <div className="flex justify-center">
               <CheckersBoard
                 state={state}
                 selectedMoves={selectedMoves}
-                playablePlayer={playerSide}
+                playablePlayer={modeConfig.gameplay.localMultiplayer ? undefined : playerSide}
                 onSelectPiece={selectPiece}
                 onMoveTo={moveSelectedTo}
               />
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-[8px] bg-[#f2efe4] px-3 py-2 text-xs text-ink/[0.56]">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-[8px] bg-[#f2efe4] px-3 py-2 text-xs text-ink/[0.56]">
               {onExit && (
                 <button
                   type="button"
@@ -166,19 +103,22 @@ export function Arena({
                   Menu
                 </button>
               )}
-              <span>{isAiThinking ? "AI thinking..." : "Tap a piece, then choose a highlighted square."}</span>
-              <div className="hidden items-center gap-3 sm:flex">
-                {onExit && (
-                  <button
-                    type="button"
-                    onClick={onExit}
-                    className="rounded-full border border-[#d9d2c0] px-3 py-1 text-ink/[0.58] transition hover:bg-white hover:text-ink"
-                  >
-                    Menu
-                  </button>
-                )}
-                <span>Turn {state.turn}</span>
-              </div>
+              <span className="truncate">
+                {isAiThinking
+                  ? "AI thinking..."
+                  : modeConfig.gameplay.localMultiplayer
+                    ? `${state.currentPlayer.toUpperCase()} to move.`
+                    : "Tap a piece, then choose a square."}
+              </span>
+              {onExit && (
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="hidden rounded-full border border-[#d9d2c0] px-3 py-1 text-ink/[0.58] transition hover:bg-white hover:text-ink sm:block"
+                >
+                  Menu
+                </button>
+              )}
             </div>
           </div>
 
@@ -189,8 +129,6 @@ export function Arena({
               {state.chaosLog[state.chaosLog.length - 1]?.description}
             </div>
           )}
-
-          <ReplayTimeline moves={state.moves} />
         </div>
       </section>
 
@@ -204,14 +142,5 @@ export function Arena({
         onMenu={onExit ?? restartMatch}
       />
     </main>
-  );
-}
-
-function Pill({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-[#ded8c9] bg-panel/[0.72] px-3 py-2 text-sm text-ink/[0.58] shadow-sm backdrop-blur-xl">
-      {icon}
-      {label}
-    </div>
   );
 }

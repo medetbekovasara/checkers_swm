@@ -5,7 +5,7 @@ import { Arena, type MatchCompletion } from "@/components/game/Arena";
 import { AiSetupScreen } from "@/components/platform/AiSetupScreen";
 import { AuthScreen } from "@/components/platform/AuthScreen";
 import { MainMenu, type PlatformScreen } from "@/components/platform/MainMenu";
-import { MatchHistoryScreen, ProfileScreen, RankingsScreen, SettingsScreen } from "@/components/platform/InfoScreens";
+import { MatchHistoryScreen, ProfileScreen } from "@/components/platform/InfoScreens";
 import { OnlineScreen } from "@/components/platform/OnlineScreen";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { usePlatformProfile } from "@/hooks/usePlatformProfile";
@@ -41,11 +41,13 @@ export function PlatformApp() {
       : match.state.winner === match.playerSide
         ? "victory"
         : "defeat";
+    const isLocalMatch = match.mode === "local";
+    const opponentLabel = isLocalMatch ? "Local player" : `${match.difficulty} AI`;
 
     void saveMatchHistoryRecord({
       mode: match.mode,
       difficulty: match.difficulty,
-      opponent: `${match.difficulty} AI`,
+      opponent: opponentLabel,
       durationSeconds: Math.max(
         1,
         Math.round((new Date(match.completedAt).getTime() - new Date(match.startedAt).getTime()) / 1000)
@@ -53,7 +55,7 @@ export function PlatformApp() {
       result,
       players: [
         { id: profile.id, handle: profile.handle, side: match.playerSide },
-        { id: "ai-opponent", handle: `${match.difficulty} AI`, side: match.playerSide === "red" ? "black" : "red" }
+        { id: isLocalMatch ? "local-player-2" : "ai-opponent", handle: opponentLabel, side: match.playerSide === "red" ? "black" : "red" }
       ],
       winner: match.state.winner,
       moves: match.state.moves,
@@ -106,11 +108,9 @@ export function PlatformApp() {
     );
   }
 
-  if (screen === "rankings") return <RankingsScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "online") return <OnlineScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "profile") return <ProfileScreen profile={profile} onBack={() => setScreen("menu")} />;
   if (screen === "history") return <MatchHistoryScreen profile={profile} onBack={() => setScreen("menu")} />;
-  if (screen === "settings") return <SettingsScreen profile={profile} onBack={() => setScreen("menu")} />;
 
   return (
     <MainMenu

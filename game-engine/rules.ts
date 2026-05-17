@@ -22,6 +22,11 @@ function directionsFor(piece: Piece) {
       ] as const);
 }
 
+function captureDirectionsFor(piece: Piece) {
+  if (piece.kind === "king") return KING_DIRECTIONS;
+  return KING_DIRECTIONS;
+}
+
 function promotionRow(player: Player) {
   return player === "red" ? 0 : 7;
 }
@@ -36,7 +41,7 @@ function captureMovesForPiece(
   const captures: Move[] = [];
   const current = path[path.length - 1];
 
-  for (const [rowDelta, colDelta] of directionsFor(piece)) {
+  for (const [rowDelta, colDelta] of captureDirectionsFor(piece)) {
     if (piece.kind === "king") {
       captures.push(...kingCaptureMovesForDirection(state, piece, path, pieces, captured, rowDelta, colDelta));
       continue;

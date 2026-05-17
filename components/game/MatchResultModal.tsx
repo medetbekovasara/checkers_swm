@@ -28,10 +28,11 @@ export function MatchResultModal({
 }: MatchResultModalProps) {
   if (state.status === "active") return null;
 
-  const result = getResultLabel(state, playerSide);
+  const result = getResultLabel(state, playerSide, mode);
   const captures = state.moves.reduce((sum, move) => sum + move.captures.length, 0);
   const durationSeconds = Math.max(1, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
   const coach = createLocalCoachReport(state);
+  const isLocalMatch = mode === "local";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/[0.28] px-4 py-6 backdrop-blur-sm">
@@ -65,10 +66,12 @@ export function MatchResultModal({
         </div>
 
         <div className="mt-4 rounded-[8px] border border-[#e6dfcf] bg-[#fbf8ef] p-4">
-          <div className="text-sm font-semibold text-ink">AI Coach</div>
-          <p className="mt-2 text-sm leading-6 text-ink/[0.58]">{coach.summary}</p>
+          <div className="text-sm font-semibold text-ink">{isLocalMatch ? "Match Summary" : "AI Coach"}</div>
+          <p className="mt-2 text-sm leading-6 text-ink/[0.58]">
+            {isLocalMatch ? "Local match complete. Review the move count, captures, and clock pressure before the rematch." : coach.summary}
+          </p>
           <div className="mt-3 grid gap-2 text-sm text-ink/[0.62]">
-            {coach.advice.slice(0, 2).map((item) => (
+            {(isLocalMatch ? getLocalSummaryItems(state) : coach.advice.slice(0, 2)).map((item) => (
               <div key={item} className="rounded-[8px] bg-white/70 px-3 py-2">
                 {item}
               </div>
@@ -102,11 +105,18 @@ export function MatchResultModal({
   );
 }
 
-function getResultLabel(state: GameState, playerSide: Player) {
+function getResultLabel(state: GameState, playerSide: Player, mode: PlayMode) {
   if (state.status === "draw") {
     return {
       title: "Draw",
       copy: "Both sides reached a stable position. Review the final phase and look for faster conversion paths."
+    };
+  }
+
+  if (mode === "local") {
+    return {
+      title: `${state.winner?.toUpperCase() ?? "Player"} wins`,
+      copy: "Clock pressure and board control decided the local match."
     };
   }
 
@@ -121,6 +131,14 @@ function getResultLabel(state: GameState, playerSide: Player) {
     title: "Defeat",
     copy: "The AI found the cleaner path this time. Use the coach notes to tighten your next match."
   };
+}
+
+function getLocalSummaryItems(state: GameState) {
+  const winner = state.winner ? `${state.winner.toUpperCase()} wins.` : "The match ended in a draw.";
+  return [
+    winner,
+    `${state.currentPlayer.toUpperCase()} was the final active side.`
+  ];
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

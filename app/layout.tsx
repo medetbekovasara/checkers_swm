@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Chaos Checkers",
-  description: "AI-powered competitive checkers platform with classic, chaos, and speed modes."
+  description: "AI-powered competitive checkers platform with classic, chaos, and local multiplayer modes."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
