@@ -20,7 +20,11 @@ export function CheckersBoard({ state, selectedMoves, playablePlayer = state.cur
 
   return (
     <motion.div
+      key={state.perspective}
       layout={false}
+      initial={{ opacity: 0.88, rotate: state.perspective === "red" ? -2 : 2, scale: 0.985 }}
+      animate={{ opacity: 1, rotate: 0, scale: 1 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
       className="grid aspect-square w-full max-w-[min(94vw,700px)] grid-cols-8 overflow-hidden rounded-[8px] border border-[#cad3d5] bg-[#e8edf0] p-2 shadow-[0_10px_28px_rgba(45,58,66,0.10)]"
     >
       {rows.flatMap((row) =>

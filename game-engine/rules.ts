@@ -26,11 +26,22 @@ function promotionRow(player: Player) {
   return player === "red" ? 0 : 7;
 }
 
-function captureMovesForPiece(state: GameState, piece: Piece, path: Position[] = [piece.position], pieces = state.pieces): Move[] {
+function captureMovesForPiece(
+  state: GameState,
+  piece: Piece,
+  path: Position[] = [piece.position],
+  pieces = state.pieces,
+  captured: Position[] = []
+): Move[] {
   const captures: Move[] = [];
   const current = path[path.length - 1];
 
   for (const [rowDelta, colDelta] of directionsFor(piece)) {
+    if (piece.kind === "king") {
+      captures.push(...kingCaptureMovesForDirection(state, piece, path, pieces, captured, rowDelta, colDelta));
+      continue;
+    }
+
     const jumped = { row: current.row + rowDelta, col: current.col + colDelta };
     const landing = { row: current.row + rowDelta * 2, col: current.col + colDelta * 2 };
     const victim = getPieceAt(pieces, jumped);
@@ -56,12 +67,13 @@ function captureMovesForPiece(state: GameState, piece: Piece, path: Position[] =
         pieceId: piece.id,
         player: piece.player,
         path: nextPath,
-        captures: pathToCaptures(nextPath)
+        captures: [...captured, jumped]
       });
       continue;
     }
 
-    const followUps = captureMovesForPiece(state, nextPiece, nextPath, nextPieces);
+    const nextCaptures = [...captured, jumped];
+    const followUps = captureMovesForPiece(state, nextPiece, nextPath, nextPieces, nextCaptures);
 
     if (followUps.length > 0) {
       captures.push(...followUps);
@@ -71,7 +83,7 @@ function captureMovesForPiece(state: GameState, piece: Piece, path: Position[] =
         pieceId: piece.id,
         player: piece.player,
         path: nextPath,
-        captures: pathToCaptures(nextPath)
+        captures: nextCaptures
       });
     }
   }
@@ -79,24 +91,86 @@ function captureMovesForPiece(state: GameState, piece: Piece, path: Position[] =
   return captures;
 }
 
-function pathToCaptures(path: Position[]) {
-  const captures: Position[] = [];
+function kingCaptureMovesForDirection(
+  state: GameState,
+  piece: Piece,
+  path: Position[],
+  pieces: Piece[],
+  captured: Position[],
+  rowDelta: number,
+  colDelta: number
+): Move[] {
+  const captures: Move[] = [];
+  const current = path[path.length - 1];
+  let cursor = { row: current.row + rowDelta, col: current.col + colDelta };
+  let victim: Piece | null = null;
 
-  for (let index = 1; index < path.length; index += 1) {
-    const previous = path[index - 1];
-    const next = path[index];
-    if (Math.abs(previous.row - next.row) === 2) {
-      captures.push({
-        row: (previous.row + next.row) / 2,
-        col: (previous.col + next.col) / 2
-      });
+  while (isInsideBoard(cursor)) {
+    const occupant = getPieceAt(pieces, cursor);
+    if (!occupant) {
+      if (victim) {
+        const landing = cursor;
+        const nextCaptures = [...captured, victim.position];
+        const nextPieces = pieces
+          .filter((candidate) => candidate.id !== victim?.id)
+          .map((candidate) =>
+            candidate.id === piece.id ? { ...candidate, position: landing } : candidate
+          );
+        const nextPiece = getPieceAt(nextPieces, landing);
+
+        if (nextPiece) {
+          const nextPath = [...path, landing];
+          const followUps = captureMovesForPiece(state, nextPiece, nextPath, nextPieces, nextCaptures);
+
+          if (followUps.length > 0) {
+            captures.push(...followUps);
+          } else {
+            captures.push({
+              id: uid("move"),
+              pieceId: piece.id,
+              player: piece.player,
+              path: nextPath,
+              captures: nextCaptures
+            });
+          }
+        }
+      }
+    } else if (occupant.player === piece.player || victim) {
+      break;
+    } else {
+      victim = occupant;
     }
+
+    cursor = { row: cursor.row + rowDelta, col: cursor.col + colDelta };
   }
 
   return captures;
 }
 
 function quietMovesForPiece(state: GameState, piece: Piece): Move[] {
+  if (piece.kind === "king") {
+    return KING_DIRECTIONS.flatMap(([rowDelta, colDelta]) => {
+      const moves: Move[] = [];
+      let cursor = {
+        row: piece.position.row + rowDelta,
+        col: piece.position.col + colDelta
+      };
+
+      while (isInsideBoard(cursor) && !getPieceAt(state.pieces, cursor)) {
+        moves.push({
+          id: uid("move"),
+          pieceId: piece.id,
+          player: piece.player,
+          path: [piece.position, cursor],
+          captures: []
+        });
+        cursor = { row: cursor.row + rowDelta, col: cursor.col + colDelta };
+      }
+
+      return moves;
+    });
+  }
+
   return directionsFor(piece)
     .map(([rowDelta, colDelta]) => ({
       row: piece.position.row + rowDelta,
@@ -154,21 +228,34 @@ export function applyMove(state: GameState, move: Move): GameState {
     forcedPieceId: undefined
   });
   const opponentPieces = nextPieces.filter((candidate) => candidate.player === opponent);
+  const nextMove = { ...legalMove, promoted };
+  const nextMoves = [...state.moves, nextMove];
   const status = opponentPieces.length === 0 || opponentMoves.length === 0
     ? winnerStatus(state.currentPlayer)
+    : isDrawByQuietPlay(nextMoves)
+      ? "draw"
     : "active";
 
   return {
     ...state,
     pieces: nextPieces,
     currentPlayer: status === "active" ? opponent : state.currentPlayer,
-    winner: status === "active" ? null : state.currentPlayer,
+    winner: status === "draw" || status === "active" ? null : state.currentPlayer,
     status,
     selectedPieceId: undefined,
     forcedPieceId: undefined,
     turn: state.turn + 1,
-    moves: [...state.moves, { ...legalMove, promoted }]
+    moves: nextMoves
   };
+}
+
+function isDrawByQuietPlay(moves: Move[]) {
+  const quietMoveLimit = 80;
+  if (moves.length < quietMoveLimit) return false;
+
+  return moves
+    .slice(-quietMoveLimit)
+    .every((move) => move.captures.length === 0 && !move.promoted);
 }
 
 function winnerStatus(player: Player) {

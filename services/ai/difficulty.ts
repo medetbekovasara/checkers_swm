@@ -9,7 +9,7 @@ import {
   type Player
 } from "@/game-engine";
 
-export type AiDifficulty = "beginner" | "intermediate" | "advanced" | "nightmare";
+export type AiDifficulty = "beginner" | "intermediate" | "nightmare";
 
 export type AiMistakeBehavior = {
   enabled: boolean;
@@ -60,25 +60,12 @@ export const AI_DIFFICULTY_CONFIGS = {
       minScoreDrop: 0
     }
   },
-  advanced: {
-    id: "advanced",
-    label: "Advanced",
-    description: "Sharper material pressure with deeper forcing-line checks.",
-    depth: 3,
-    personality: "aggressive",
-    mistake: {
-      enabled: false,
-      cadence: 0,
-      maxRankOffset: 0,
-      minScoreDrop: 0
-    }
-  },
   nightmare: {
     id: "nightmare",
     label: "Nightmare",
-    description: "Maximum bounded search with volatility-aware move ordering.",
+    description: "Deepest bounded search with aggressive pressure.",
     depth: 4,
-    personality: "chaos",
+    personality: "aggressive",
     mistake: {
       enabled: false,
       cadence: 0,
@@ -91,7 +78,6 @@ export const AI_DIFFICULTY_CONFIGS = {
 export const AI_DIFFICULTY_ORDER: AiDifficulty[] = [
   "beginner",
   "intermediate",
-  "advanced",
   "nightmare"
 ];
 

@@ -15,7 +15,9 @@ export function createLocalCoachReport(finalState: GameState): CoachReport {
   return {
     summary: finalState.winner
       ? `${finalState.winner.toUpperCase()} closed the game in ${finalState.moves.length} moves with ${captures} captures.`
-      : `The game is still live after ${finalState.moves.length} moves.`,
+      : finalState.status === "draw"
+        ? `The game ended in a draw after ${finalState.moves.length} moves with ${captures} captures.`
+        : `The game is still live after ${finalState.moves.length} moves.`,
     advice: [
       missed > 0 ? `Review ${missed} missed capture windows before committing quiet moves.` : "Capture discipline was solid.",
       dangerous > 0 ? "Several moves allowed multi-capture replies. Stabilize the back rank before forcing trades." : "You kept opponent reply threats mostly under control.",

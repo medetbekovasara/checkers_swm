@@ -1,44 +1,85 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, Radio } from "lucide-react";
 import { CheckersBoard } from "@/components/board/CheckersBoard";
-import { ChaosFeed } from "@/components/game/ChaosFeed";
-import { CoachPanel } from "@/components/game/CoachPanel";
 import { GameHud } from "@/components/game/GameHud";
-import { Leaderboard } from "@/components/game/Leaderboard";
+import { MatchResultModal } from "@/components/game/MatchResultModal";
 import { ReplayTimeline } from "@/components/game/ReplayTimeline";
 import { useChaosCheckers } from "@/hooks/useChaosCheckers";
+import type { GameState, Player } from "@/game-engine";
 import type { AiDifficulty } from "@/services/ai/difficulty";
-import { getPlayModeConfig, type PlayMode } from "@/services/ai/modes";
+import type { PlayMode } from "@/services/ai/modes";
+
+export type MatchCompletion = {
+  state: GameState;
+  playerSide: Player;
+  difficulty: AiDifficulty;
+  mode: PlayMode;
+  startedAt: string;
+  completedAt: string;
+};
 
 type ArenaProps = {
   initialMode?: PlayMode;
   initialDifficulty?: AiDifficulty;
   onExit?: () => void;
+  onMatchComplete?: (match: MatchCompletion) => void;
 };
 
-export function Arena({ initialMode = "chaos", initialDifficulty = "intermediate", onExit }: ArenaProps) {
+export function Arena({
+  initialMode = "chaos",
+  initialDifficulty = "intermediate",
+  onExit,
+  onMatchComplete
+}: ArenaProps) {
   const {
     state,
     selectedMoves,
     aiDifficulty,
     setAiDifficulty,
+    mode,
+    modeConfig,
+    timers,
     selectPiece,
     moveSelectedTo,
     playerSide,
     isAiThinking,
     reset
-  } = useChaosCheckers(getPlayModeConfig(initialMode).engineMode, initialDifficulty, "red");
+  } = useChaosCheckers(initialMode, initialDifficulty, "red");
 
   const [origin, setOrigin] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [startedAt, setStartedAt] = useState(() => new Date().toISOString());
+  const reportedMatchRef = useRef<string | null>(null);
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
 
+  useEffect(() => {
+    if (state.status === "active") return;
+
+    const reportKey = `${state.id}:${state.status}:${state.moves.length}`;
+    if (reportedMatchRef.current === reportKey) return;
+    reportedMatchRef.current = reportKey;
+
+    onMatchComplete?.({
+      state,
+      playerSide,
+      difficulty: aiDifficulty,
+      mode: initialMode,
+      startedAt,
+      completedAt: new Date().toISOString()
+    });
+  }, [aiDifficulty, initialMode, onMatchComplete, playerSide, startedAt, state]);
+
   const roomUrl = origin ? `${origin}/room/${state.id}` : `/room/${state.id}`;
+  const restartMatch = () => {
+    reportedMatchRef.current = null;
+    setStartedAt(new Date().toISOString());
+    reset(initialMode);
+  };
 
   const copyRoomLink = async () => {
     if (!navigator.clipboard) {
@@ -76,13 +117,16 @@ export function Arena({ initialMode = "chaos", initialDifficulty = "intermediate
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-4 lg:gap-5 xl:grid-cols-[270px_minmax(0,1fr)_300px]">
+      <section className="mx-auto grid max-w-6xl gap-4 lg:gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
         <GameHud
           state={state}
+          mode={mode}
+          modeConfig={modeConfig}
+          timers={timers}
           aiDifficulty={aiDifficulty}
           onAiDifficultyChange={setAiDifficulty}
           isAiThinking={isAiThinking}
-          onReset={reset}
+          onReset={restartMatch}
           className="order-2 xl:order-1"
         />
 
@@ -138,15 +182,27 @@ export function Arena({ initialMode = "chaos", initialDifficulty = "intermediate
             </div>
           </div>
 
+          {modeConfig.gameplay.chaosEvents && state.chaosLog.length > 0 && (
+            <div className="rounded-[8px] border border-violet/[0.22] bg-violet/[0.10] px-4 py-3 text-sm text-ink/[0.66] shadow-sm">
+              <span className="font-semibold uppercase tracking-[0.12em] text-ink">CHAOS EVENT: SIDES SWAPPED</span>
+              <span className="mx-2 text-ink/[0.35]">·</span>
+              {state.chaosLog[state.chaosLog.length - 1]?.description}
+            </div>
+          )}
+
           <ReplayTimeline moves={state.moves} />
         </div>
-
-        <div className="order-3 min-w-0 space-y-4">
-          <ChaosFeed state={state} />
-          <CoachPanel state={state} />
-          <Leaderboard />
-        </div>
       </section>
+
+      <MatchResultModal
+        state={state}
+        playerSide={playerSide}
+        difficulty={aiDifficulty}
+        mode={initialMode}
+        startedAt={startedAt}
+        onRestart={restartMatch}
+        onMenu={onExit ?? restartMatch}
+      />
     </main>
   );
 }

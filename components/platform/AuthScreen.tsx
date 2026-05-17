@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, UserRound } from "lucide-react";
 import type { AuthView } from "@/hooks/useAuthSession";
+import { isSupabaseConfigured } from "@/services/supabase/client";
 
 type AuthScreenProps = {
   error: string | null;
@@ -19,7 +20,7 @@ export function AuthScreen({ error, onLogin, onSignup, onGuest }: AuthScreenProp
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (busy) return;
+    if (busy || !isSupabaseConfigured) return;
     setBusy(true);
     if (view === "login") await onLogin(email, password);
     else await onSignup(email, password, handle || email.split("@")[0] || "Player");
@@ -42,8 +43,8 @@ export function AuthScreen({ error, onLogin, onSignup, onGuest }: AuthScreenProp
             </p>
           </div>
           <div className="grid gap-3 text-sm text-ink/[0.62] sm:grid-cols-3">
-            <Metric label="AI modes" value="5" />
-            <Metric label="Difficulties" value="4" />
+            <Metric label="AI modes" value="3" />
+            <Metric label="Difficulties" value="3" />
             <Metric label="Guest ready" value="Yes" />
           </div>
         </div>
@@ -71,11 +72,18 @@ export function AuthScreen({ error, onLogin, onSignup, onGuest }: AuthScreenProp
             )}
             <TextInput label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
             <TextInput label="Password" value={password} onChange={setPassword} placeholder="••••••••" type="password" />
-            {error && <div className="rounded-[8px] bg-ember/[0.12] px-3 py-2 text-sm text-ink/[0.68]">{error}</div>}
+            {!isSupabaseConfigured && (
+              <div className="rounded-[8px] border border-[#ded8c9] bg-[#f8f5ec] px-3 py-2 text-sm leading-5 text-ink/[0.62]">
+                Supabase is not configured locally. Use guest mode, or add Supabase env vars to enable login and signup.
+              </div>
+            )}
+            {error && isSupabaseConfigured && (
+              <div className="rounded-[8px] bg-ember/[0.12] px-3 py-2 text-sm text-ink/[0.68]">{error}</div>
+            )}
             <button
               type="button"
               onClick={() => void submit()}
-              disabled={busy}
+              disabled={busy || !isSupabaseConfigured}
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-ink px-4 py-3 font-semibold text-bone transition hover:bg-[#34383d] disabled:opacity-50"
             >
               {view === "login" ? "Continue" : "Create profile"}

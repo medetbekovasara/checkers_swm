@@ -35,6 +35,24 @@ create table player_profiles (
 );
 
 create index player_profiles_xp_idx on player_profiles (xp desc);
+
+create table match_history (
+  id text primary key,
+  room_id text,
+  mode text not null,
+  difficulty text not null default 'human',
+  opponent text,
+  duration_seconds integer,
+  result text not null default 'draw',
+  players jsonb not null,
+  winner text,
+  moves jsonb not null,
+  started_at timestamptz not null,
+  completed_at timestamptz not null,
+  state_hash text not null
+);
+
+create index match_history_completed_at_idx on match_history (completed_at desc);
 ```
 
 Recommended RLS assumptions:
@@ -49,3 +67,7 @@ Recommended RLS assumptions:
 - Profile persistence falls back locally when Supabase is not configured.
 - Ranking reads from `player_profiles` ordered by `xp desc`; result updates are calculated in the ranking service
   and persisted through the profile service.
+- Match history writes through `services/history/history.ts`; it uses Supabase when configured and in-memory local
+  fallback otherwise.
+- Ranking XP now accepts optional result context: `difficulty`, `mode`, and `streak`. Existing result updates still
+  work without context and default to friendly human-match scoring.

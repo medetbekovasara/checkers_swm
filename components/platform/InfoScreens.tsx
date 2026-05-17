@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowLeft, History, Settings, Trophy, UserRound } from "lucide-react";
 import { Leaderboard } from "@/components/game/Leaderboard";
 import type { PlayerProfile } from "@/services/profile/profile";
+import { fetchMatchHistory, type MatchHistoryRecord } from "@/services/history/history";
+import { getRankTier } from "@/services/ranking/ranking";
 
 type InfoScreenProps = {
   profile: PlayerProfile;
@@ -20,7 +23,12 @@ export function ProfileScreen({ profile, onBack }: InfoScreenProps) {
       <div className="rounded-[8px] border border-[#ded8c9] bg-panel/[0.84] p-4">
         <div className="text-sm text-ink/[0.52]">Handle</div>
         <div className="mt-1 text-2xl font-semibold text-ink">{profile.handle}</div>
-        <div className="mt-3 text-sm text-ink/[0.52]">{profile.email ?? "Guest session"}</div>
+        <div className="mt-3 grid gap-2 text-sm text-ink/[0.56] sm:grid-cols-2">
+          <div>{profile.email ?? "Guest session"}</div>
+          <div className="font-medium text-ink/[0.66]">Rank: {getRankTier(profile.xp)}</div>
+          <div>Matches: {profile.stats.gamesPlayed}</div>
+          <div>W/L/D: {profile.stats.wins}/{profile.stats.losses}/{profile.stats.draws}</div>
+        </div>
       </div>
     </ScreenShell>
   );
@@ -37,10 +45,40 @@ export function RankingsScreen({ profile, onBack }: InfoScreenProps) {
   );
 }
 
-export function MatchHistoryScreen({ onBack }: { onBack: () => void }) {
+export function MatchHistoryScreen({ profile, onBack }: InfoScreenProps) {
+  const [matches, setMatches] = useState<MatchHistoryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    void fetchMatchHistory(profile.id, 20)
+      .then((result) => {
+        if (active && result.ok) setMatches(result.data);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile.id]);
+
   return (
     <ScreenShell title="Match History" icon={<History className="h-5 w-5" />} onBack={onBack}>
-      <EmptyState title="No saved matches yet" copy="Finished AI games will appear here once match persistence is connected." />
+      {loading ? (
+        <EmptyState title="Loading matches" copy="Pulling your recent AI games and summaries." />
+      ) : matches.length === 0 ? (
+        <EmptyState title="No saved matches yet" copy="Finished AI games will appear here after your next match." />
+      ) : (
+        <div className="space-y-3">
+          {matches.map((match) => (
+            <MatchHistoryItem key={match.id} match={match} />
+          ))}
+        </div>
+      )}
     </ScreenShell>
   );
 }
@@ -109,4 +147,40 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink/[0.56]">{copy}</p>
     </div>
   );
+}
+
+function MatchHistoryItem({ match }: { match: MatchHistoryRecord }) {
+  return (
+    <div className="rounded-[8px] border border-[#ded8c9] bg-panel/[0.84] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="capitalize text-lg font-semibold text-ink">{match.result}</div>
+          <div className="mt-1 text-sm text-ink/[0.54]">
+            vs {match.opponent} · {match.mode} · {match.difficulty}
+          </div>
+        </div>
+        <div className="text-sm text-ink/[0.48]">{formatDate(match.completedAt)}</div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <Stat label="Duration" value={formatDuration(match.durationSeconds)} />
+        <Stat label="Moves" value={match.moves.length.toString()} />
+        <Stat label="Captures" value={match.moves.reduce((sum, move) => sum + move.captures.length, 0).toString()} />
+      </div>
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatDuration(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }

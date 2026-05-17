@@ -1,14 +1,25 @@
-import type { GameMode } from "@/game-engine";
+import type { GameMode, Player } from "@/game-engine";
 
-export type AiMode = "classic" | "chaos" | "swap" | "speed" | "experimental";
+export type AiMode = "classic" | "chaos" | "speed";
 export type PlayMode = AiMode;
+export type GameTimers = Record<Player, number | null>;
 
 export type AiModeConfig = {
   id: AiMode;
   label: string;
   description: string;
   engineMode: GameMode;
-  supportsChaosEvents: boolean;
+  gameplay: {
+    chaosEvents: boolean;
+    chaosIntervalTurns: number | null;
+    chaosStartsAfterTurn: number;
+    chaosProbability: number;
+    chaosCooldownTurns: number;
+    chaosMaxEvents: number;
+    timers: boolean;
+    initialClockSeconds: number | null;
+    aiDelayMs: number;
+  };
 };
 
 export const AI_MODES = {
@@ -17,35 +28,51 @@ export const AI_MODES = {
     label: "Classic",
     description: "Standard checkers rules using the classic engine mode.",
     engineMode: "classic",
-    supportsChaosEvents: false
+    gameplay: {
+      chaosEvents: false,
+      chaosIntervalTurns: null,
+      chaosStartsAfterTurn: 0,
+      chaosProbability: 0,
+      chaosCooldownTurns: 0,
+      chaosMaxEvents: 0,
+      timers: false,
+      initialClockSeconds: null,
+      aiDelayMs: 360
+    }
   },
   chaos: {
     id: "chaos",
     label: "Chaos",
-    description: "Chaos event rules backed by the current chaos engine mode.",
+    description: "Adaptive checkers with rare board events that force strategic resets.",
     engineMode: "chaos",
-    supportsChaosEvents: true
-  },
-  swap: {
-    id: "swap",
-    label: "Swap",
-    description: "Variant shell mapped to chaos until the engine owns a dedicated swap mode.",
-    engineMode: "chaos",
-    supportsChaosEvents: true
+    gameplay: {
+      chaosEvents: true,
+      chaosIntervalTurns: 1,
+      chaosStartsAfterTurn: 6,
+      chaosProbability: 0.34,
+      chaosCooldownTurns: 8,
+      chaosMaxEvents: 3,
+      timers: false,
+      initialClockSeconds: null,
+      aiDelayMs: 520
+    }
   },
   speed: {
     id: "speed",
     label: "Speed",
-    description: "Fast-play shell mapped to classic rules without engine type changes.",
+    description: "Classic rules with a fast shared clock pressure layer.",
     engineMode: "classic",
-    supportsChaosEvents: false
-  },
-  experimental: {
-    id: "experimental",
-    label: "Experimental",
-    description: "Incubator shell mapped to chaos for current engine compatibility.",
-    engineMode: "chaos",
-    supportsChaosEvents: true
+    gameplay: {
+      chaosEvents: false,
+      chaosIntervalTurns: null,
+      chaosStartsAfterTurn: 0,
+      chaosProbability: 0,
+      chaosCooldownTurns: 0,
+      chaosMaxEvents: 0,
+      timers: true,
+      initialClockSeconds: 90,
+      aiDelayMs: 480
+    }
   }
 } satisfies Record<AiMode, AiModeConfig>;
 
@@ -54,9 +81,7 @@ export const PLAY_MODES = AI_MODES;
 export const AI_MODE_ORDER: AiMode[] = [
   "classic",
   "chaos",
-  "swap",
-  "speed",
-  "experimental"
+  "speed"
 ];
 
 export function getAiModeConfig(mode: AiMode): AiModeConfig {

@@ -2,6 +2,7 @@
 
 import { BarChart3, Bot, Clock3, Globe2, Settings, Trophy, UserRound } from "lucide-react";
 import type { PlayerProfile } from "@/services/profile/profile";
+import { getRankTier } from "@/services/ranking/ranking";
 
 export type PlatformScreen = "menu" | "ai-setup" | "rankings" | "profile" | "history" | "settings" | "game";
 
@@ -65,7 +66,9 @@ export function MainMenu({ profile, onNavigate, onLogout }: MainMenuProps) {
             Progress
           </div>
           <div className="mt-5 text-5xl font-semibold text-ink">Lv {profile.level}</div>
-          <div className="mt-2 text-sm text-ink/[0.54]">{profile.xp} XP · {xpToNext} XP to next level</div>
+          <div className="mt-2 text-sm text-ink/[0.54]">
+            {getRankTier(profile.xp)} · {profile.xp} XP · {xpToNext} XP to next level
+          </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#ece6d8]">
             <div className="h-full rounded-full bg-violet" style={{ width: `${(profile.xp % 500) / 5}%` }} />
           </div>

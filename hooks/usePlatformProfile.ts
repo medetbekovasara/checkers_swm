@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AuthIdentity } from "@/services/auth/auth";
 import { loadPlayerProfile, savePlayerProfile, type PlayerProfile } from "@/services/profile/profile";
 
@@ -29,10 +29,10 @@ export function usePlatformProfile(identity: AuthIdentity | null) {
     };
   }, [identity]);
 
-  const updateProfile = (next: PlayerProfile) => {
+  const updateProfile = useCallback((next: PlayerProfile) => {
     setProfile(next);
     void savePlayerProfile(next);
-  };
+  }, []);
 
   return {
     profile,
